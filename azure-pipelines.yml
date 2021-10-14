@@ -1,0 +1,78 @@
+pool:
+  name: Azure Pipelines
+  demands:
+  - npm
+  - node.js
+
+#Your build pipeline references the ‘BuildConfiguration’ variable, which you’ve selected to be settable at queue time. Create or edit the build pipeline for this YAML file, define the variable on the Variables tab, and then select the option to make it settable at queue time. See https://go.microsoft.com/fwlink/?linkid=865971
+#Your build pipeline references the ‘BuildConfiguration’ variable, which you’ve selected to be settable at queue time. Create or edit the build pipeline for this YAML file, define the variable on the Variables tab, and then select the option to make it settable at queue time. See https://go.microsoft.com/fwlink/?linkid=865971
+
+steps:
+- task: DotNetCoreCLI@1
+  displayName: Restore
+  inputs:
+    command: restore
+    projects: '**/*.csproj'
+
+- task: Npm@1
+  displayName: 'npm install bower'
+  inputs:
+    command: custom
+    workingDir: src/MyHealth.Web
+    verbose: false
+    customCommand: 'install -g bower'
+
+- task: Npm@1
+  displayName: 'npm install'
+  inputs:
+    workingDir: src/MyHealth.Web
+    verbose: false
+
+- task: touchify.vsts-bower.bower.Bower@0
+  displayName: 'bower install'
+  inputs:
+    bowerjson: src/MyHealth.Web/bower.json
+
+- task: DotNetCoreCLI@1
+  displayName: Build
+  inputs:
+    projects: '**/*.csproj'
+    arguments: '--configuration $(BuildConfiguration)'
+
+- task: DotNetCoreCLI@1
+  displayName: Test
+  inputs:
+    command: test
+    projects: '**/*Tests/*.csproj'
+    arguments: '--logger:trx;logfilename=TEST.xml'
+
+- task: DotNetCoreCLI@1
+  displayName: Publish
+  inputs:
+    command: publish
+    arguments: '--configuration $(BuildConfiguration) --output $(build.artifactstagingdirectory)'
+
+- task: PublishTestResults@2
+  displayName: 'Publish Test Results'
+  inputs:
+    testResultsFormat: VSTest
+    testResultsFiles: '**/TEST.xml'
+    mergeTestResults: true
+    testRunTitle: MyHealthClinic
+
+- task: CopyFiles@2
+  displayName: 'Copy Files'
+  inputs:
+    SourceFolder: '$(build.sourcesdirectory)'
+    Contents: |
+     **/*.json
+     **/custom/**
+    TargetFolder: '$(build.artifactstagingdirectory)'
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Artifact'
+  inputs:
+    PathtoPublish: '$(build.artifactstagingdirectory)'
+
+   
+
